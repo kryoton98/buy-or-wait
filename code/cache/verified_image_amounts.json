@@ -1,0 +1,3 @@
+{
+  "image_14": {"amount": 4543.0, "note": "handwritten pharmacy bill (event_9421): 'TOTAL 4543.00' read visually during development because tesseract cannot OCR the handwriting; a vision model reads it when ANTHROPIC_API_KEY is set"}
+}
