@@ -1,0 +1,5 @@
+pandas>=2.0
+numpy>=1.24
+# Optional: tesseract-ocr binary for reading receipt/payslip images when cache/ocr_cache.json misses
+#   Debian/Ubuntu: sudo apt-get install tesseract-ocr
+# Optional: set ANTHROPIC_API_KEY to enable the LLM/vision fallback (uses only the standard library to call the API)
