@@ -1,0 +1,93 @@
+{
+  "requests": 250,
+  "output": "/home/wsl/buy-or-wait/output.csv",
+  "seconds": 4.0,
+  "verification_problems": [],
+  "llm": {
+    "model": "claude-sonnet-4-5",
+    "calls": 0,
+    "cache_hits": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "enabled": false
+  },
+  "image_evidence": {
+    "event_253": {
+      "amount": 4365000.0,
+      "how": "net pay -> Net Pay : IDR 4,365,000 (confirmed by words)"
+    },
+    "event_1442": {
+      "amount": 100000.0,
+      "how": "balance due -> Balance Due: 1,00,000.00"
+    },
+    "event_1545": {
+      "amount": 41272.0,
+      "how": "cash paid -> Cash Paid: 41272,00"
+    },
+    "event_1700": {
+      "amount": 2854.0,
+      "how": "item bill -> Item Bill 2854.00"
+    },
+    "event_1786": {
+      "amount": 704.05,
+      "how": "amount due till (next line) -> = 704.05 (confirmed by words)"
+    },
+    "event_3051": {
+      "amount": 1995.0,
+      "how": "^total\\b -> Total 7 47.49 47.49 1995.00 (confirmed by words)"
+    },
+    "event_3231": {
+      "amount": 8528.0,
+      "how": "grand total -> Grand Total CRS) ; 8528"
+    },
+    "event_4535": {
+      "amount": 15339.0,
+      "how": "total amount received -> Total Amount Received F 15,339.00 (confirmed by words)"
+    },
+    "event_5170": {
+      "amount": 723.0,
+      "how": "total amount received -> Total Amount Received = 723.00 (confirmed by words)"
+    },
+    "event_6033": {
+      "amount": 79679.26,
+      "how": "amount in words (79679.26); digits read 279679.26 [balance due -> Balance Due 279,679.26]"
+    },
+    "event_6859": {
+      "amount": 3650.0,
+      "how": "amount payable -> Amount Payable: 3650.00"
+    },
+    "event_7307": {
+      "amount": 33.5,
+      "how": "^total\\b -> Total: $33.50"
+    },
+    "event_7941": {
+      "amount": 2298.0,
+      "how": "total paid -> Total paid %2,298"
+    },
+    "event_9421": {
+      "amount": 4543.0,
+      "how": "verified during development: handwritten pharmacy bill (event_9421): 'TOTAL 4543.00' read visually during development because tesseract cannot OCR the handwriting; a vision model reads it when ANTHROPIC_API_KEY is set"
+    },
+    "event_9806": {
+      "amount": 9968.0,
+      "how": "grand total -> Grand Total 9,124.0) 388.00| 9512-0 0.00 228.00 228.00 0.00] 9,968.00"
+    },
+    "event_10521": {
+      "amount": 393.22,
+      "how": "^total\\b -> Total 393.22 (confirmed by words)"
+    }
+  },
+  "status_counts": {
+    "affordable_with_plan": 89,
+    "affordable_later": 63,
+    "affordable_now": 51,
+    "not_affordable": 47
+  },
+  "method_counts": {
+    "full_payment": 67,
+    "wait": 63,
+    "installments": 63,
+    "not_recommended": 47,
+    "partial_payment": 10
+  }
+}
