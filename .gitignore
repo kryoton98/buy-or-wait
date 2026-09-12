@@ -1,4 +1,3 @@
-log.txt
 __pycache__/
 *.pyc
 code/cache/llm_cache.json
