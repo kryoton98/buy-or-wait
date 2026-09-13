@@ -145,3 +145,45 @@ branch=main
 repo_root=/home/claude/repo
 worktree=main
 parent_agent=none
+
+## [2026-09-12T23:40:22+00:00] SESSION START
+
+tool=Claude Code
+Repo Root: /home/wsl/buy-or-wait
+Branch: tune-forecast
+Worktree: main
+Parent Agent: none
+Language: py
+Time Remaining: 0d 12h 49m
+
+## [2026-09-12T23:58:18+00:00] Baseline confirmed; compare.py blast-radius tool rewritten and committed
+
+User Prompt (verbatim, secrets redacted):
+Read HANDOVER.md and code/README.md, run the samples scorer and validator, and confirm
+the baseline (status 24/25, method 24/25, plan 23/25, changes 23/25, earliest 24/25,
+median error 0.81%). Rules for this session: never edit dataset/ or AGENTS.md; never
+special-case a user_id or request_id; keep everything deterministic; after every change
+show a before/after table of the six metrics and revert on any regression; commit each
+kept improvement separately.
+
+First task: write code/evaluation/compare.py that takes two output.csv paths and prints,
+per column, how many of the 250 rows differ, plus a status-transition matrix and the
+list of changed request_ids. I will use it to judge the blast radius of every change.
+
+Agent Response Summary:
+Read HANDOVER.md and code/README.md, ran the sample scorer and validator in WSL and confirmed the baseline exactly (status 24/25, method 24/25, plan 23/25, changes 23/25, earliest 24/25, median |err| 0.81%; output.csv VALID); a fresh `code/main.py --llm off` run reproduces output.csv and decisions_debug.jsonl byte-for-byte. The existing committed compare.py (4f7ebe8) had no transition matrix, so it was rewritten: per-column differing-row counts with formatting-only differences split out, amount_safe_to_pay shift summary, status and method transition matrices, changed request_ids with before -> after values, exit 2 on unreadable input. Verified with a 38-check scratch harness (identical files, controlled perturbations, blank template, duplicate/missing ids, header mismatch, determinism); sample metrics unchanged after the change. Committed as 92b7e7d on branch tune-forecast; log.txt left uncommitted.
+
+Actions:
+* read HANDOVER.md, code/README.md, code/main.py, code/evaluation/main.py, code/evaluation/compare.py (previous version), code/buyorwait/pipeline.py
+* ran python3 code/evaluation/main.py samples (twice) and python3 code/evaluation/main.py validate
+* ran python3 code/main.py --quiet --llm off with --output/--debug-jsonl in the session scratchpad; cmp against output.csv and decisions_debug.jsonl (identical); restored code/evaluation/run_summary.json (only output path and seconds drifted)
+* rewrote code/evaluation/compare.py; ran scratch test harness test_compare.py (38/38 PASS)
+* git commit 92b7e7d "feat(eval): compare.py transition matrices and format-only diff counts"
+* saved a Claude Code memory note on running WSL commands from PowerShell (outside the repo)
+
+Context:
+tool=Claude Code
+branch=tune-forecast
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none

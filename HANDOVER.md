@@ -75,4 +75,4 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 - No hardcoded labels, no organizer-only files, secrets from environment variables only.
 - Every output row passes `planner.verify()` before it is written; a failure falls back to the
   conservative `not_recommended` row and is recorded in `evaluation/run_summary.json`.
-- `log.txt` is append-only and must never be committed (see `AGENTS.md` §2 and `.gitignore`).
+- `log.txt` is append-only and may be committed since upstream AGENTS.md dropped the never-commit rule (keep the repo private).
