@@ -187,3 +187,38 @@ branch=tune-forecast
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T00:21:10+00:00] request_19 investigation: no general rule; findings in HANDOVER.md
+
+User Prompt (verbatim, secrets redacted):
+Investigate request_19. Time-box: 30 minutes. Our amount_safe_to_pay is 29,732.13; the
+reference is exactly 28,820 (a round number), so the reference reserves ~912 INR more
+before the 2024-09-15 payday. Write a throwaway script using
+buyorwait.forecast.build_state and simulate() to print the labelled day-by-day balance
+path up to payday. Check, in order: (a) whether one extra occurrence of a
+groceries/transport/dining chain before payday explains the gap, (b) whether a
+pending/scheduled row is reserved on the wrong date, (c) whether the variable base
+estimates in recurrence._base_amount are ~3% low for this user. Express any finding as
+a general rule like FIRST_GAP in recurrence.py, score it on all 25 samples, run
+python3 code/evaluation/compare.py /tmp/baseline_output.csv output.csv, and report the
+before/after metrics and blast radius before I decide. If no general rule emerges in
+the time-box, write the findings under "Known open items" in HANDOVER.md, commit, and
+stop — no special cases.
+
+Agent Response Summary:
+A throwaway script on build_state/simulate printed the labelled path: headroom 106,745, binding checkpoint 2024-09-14 (day before payday), we reserve 77,012.87 while the reference implies 77,925 (+912.13). (a) and (b) are ruled out: groceries (7 d) and transport (14 d) project exactly one occurrence each before payday (FIRST_GAP variants change nothing; an extra occurrence costs 4,462.43 / 3,213.63), and user_19 has no pending/scheduled rows. (c) A uniform x1.0318 on noise-estimated debit bases reproduces 28,820 but regresses the samples as a rule (x1.03: changes 23->20, earliest 24->22, median 0.81%->1.99%; x1.015: median 1.30%). A third of the gap (312.15) comes from image_04's cropped "Item Bill 2854.00" pulling the grocery base down to the mid-range; the rules that fix only that part (OUTLIER_LOW 0.65, infeasible-interval fallback hi/(1+w)) move no scored metric and only request_19 among the samples, and change 2 amounts / flip 1 decision (request_78) on the 250 rows. No general rule emerged, so no code changed: findings written under Known open items in HANDOVER.md and committed as c10ee5a, sample metrics unchanged; time-box used about 13 of 30 minutes.
+
+Actions:
+* read code/buyorwait/forecast.py, recurrence.py, planner.py, HANDOVER.md, dataset/media/images/image_04.png; grep problem_statement.md; dumped user_19 profile, events and messages
+* cp output.csv /tmp/baseline_output.csv
+* wrote and ran scratchpad scripts r19.py (labelled path and what-ifs), score_variants.py (in-process rule variants scored on the 25 samples) and blast.py (250-row runs to /tmp/r19_none.csv, /tmp/r19_outlier065.csv, /tmp/r19_infeasible_upper.csv)
+* ran python3 code/evaluation/compare.py /tmp/baseline_output.csv /tmp/r19_<variant>.csv for each variant (control run: 0 differences)
+* edited HANDOVER.md (request_19 item under Known open items); git commit c10ee5a "docs(handover): request_19 investigation findings"
+* ran python3 code/evaluation/main.py samples after the commit (unchanged)
+
+Context:
+tool=Claude Code
+branch=tune-forecast
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
