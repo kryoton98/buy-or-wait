@@ -63,8 +63,30 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 - request_06 and request_12: the reference answer prefers a spending-change plan where the
   forecast says none is needed (and vice versa) — both are within ~8 % of the balance floor, i.e.
   the variable-spending base estimate is slightly off.
-- request_19: reference pays a round 28,820 today rather than the computed 29,732.13; suggests
-  the ground truth rounds the partial first payment in some way not yet identified.
+- request_19 (30-minute investigation on 2026-09-13, no general rule found): the reference's
+  28,820 vs our 29,732.13 is a reservation difference, not rounding. Headroom is 199,545 − 92,800
+  = 106,745 and the binding checkpoint is 2024-09-14, the day before payday. We reserve 77,012.87
+  up to then (rent 36,100, loan 11,850, cloud 395, noise-estimated utilities 5,881.31, groceries
+  4,462.43, transport 3,213.63, clinic 9,030.50, shopping anchor 6,080); the reference implies
+  77,925 (+912.13).
+  * (a) Extra every-N-day occurrence: ruled out. Groceries (7 d) and transport (14 d) each project
+    exactly one occurrence before payday, with or without `FIRST_GAP`; one more would cost
+    4,462.43 / 3,213.63, far more than the gap.
+  * (b) Pending/scheduled row on the wrong date: ruled out — user_19 has no such rows.
+  * (c) Variable bases ~3 % low: a uniform ×1.0318 on noise-estimated debit bases reproduces
+    28,820, but as a rule it regresses the other samples (×1.03: changes 23→20, earliest 24→22,
+    median error 0.81 %→1.99 %; ×1.015: median 1.30 %).
+  * Partial cause, 312.15 of the 912.13: `image_04` fills event_1700 (settled 2024-09-03, blank
+    amount) with "Item Bill 2854.00" — the order total is cropped out of the image. 2,854 is
+    0.602 × the grocery median, just above `OUTLIER_LOW = 0.6`, so it stays in the estimate, makes
+    the noise interval infeasible and drops the base to the mid-range 4,462.43 (4,774.57 without
+    it). `OUTLIER_LOW = 0.65`, or falling back to hi/(1+w) when the interval is infeasible, fixes
+    only that part: among the samples only request_19 moves (error 3.16 % → 2.08 % / 2.19 %, the six
+    metrics are unchanged); on the 250 requests 0.65 lowers two amounts (request_219, request_264
+    −3 %) and the fallback flips request_78 from full payment with changes to wait. Not adopted:
+    the only supporting evidence is this one sample.
+  * Still unexplained: ~600. With groceries at 4,774.57 the four noise-estimated items sum to
+    22,900.02, while the reference implies 23,500 for them (same item set, shopping at 6,080).
 - The LLM layer is wired but unexercised; enabling it (`ANTHROPIC_API_KEY`) only affects messages
   the templates cannot classify (currently none) and unreadable images (currently one).
 - `code/evaluation/decisions_debug.jsonl` holds per-request series, facts, candidates and notes —
