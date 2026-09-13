@@ -268,3 +268,39 @@ branch=tune-forecast
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T01:05:04+00:00] Single-period first gaps rejected; mid-range base estimator adopted
+
+User Prompt (verbatim, secrets redacted):
+Time-box 20 minutes. Your "one day early on every period" test bundled all periods; test
+the first-gap shortening for each remaining period individually with the same harness:
+FIRST_GAP[14]=13, [10]=9, [5]=4, each alone on top of the current {21:15, 7:6}. Report
+the metrics table and blast radius vs /tmp/v2_output.csv for each. Adopt only a variant
+that improves the total with no regression; otherwise record the table in HANDOVER.md.
+
+Then, time-box 30 minutes: build code/evaluation/experiments/estimators.py that
+monkeypatches recurrence._base_amount with alternatives — history mean, median,
+midrange, mean of the last three, and the current estimator over NOISE_WIDE in
+{0.25, 0.28, 0.30} x NOISE_TIGHT in {0.10, 0.12, 0.15} — and prints the six metrics plus
+mean and median error for each on the 25 samples. Show the table. Change the default
+only if a variant lowers median error with no regression in the exact-match counts and
+you can explain why it is more principled. Commit and push whatever you keep, including
+log.txt.
+
+Agent Response Summary:
+Part 1 (about 3 of 20 minutes): scored FIRST_GAP[14]=13, [10]=9 and [5]=4 each alone on top of {21: 15, 7: 6} with the rules harness and compare.py against /tmp/v2_output.csv; none improves the total (all 122, median 0.61%), [10]=9 and [5]=4 break the request_24 / request_25 amounts (19% / 41% error) and change 11 / 13 of the 250 rows, and [14]=13 changes one row, so nothing was adopted and the table was recorded in HANDOVER.md (a88a3c3). Part 2 (about 25 of 30 minutes): built code/evaluation/experiments/estimators.py (0a6c24d), which patches only the noisy-series branch of recurrence._base_amount and stars the variant that reproduces the current code; on the 25 samples the mid-range is the only variant with lower median error (0.61% -> 0.50%, mean 2.80% -> 2.24%) and unchanged exact-match counts (request_12 change set gained, request_21 lost; within 2% 19 -> 18). It was adopted because under the documented uniform noise the mid-range is the unbiased minimum-variance estimate for any band width, while the noise-interval centre carries an upward small-sample bias of about 2w^2/((n+1)(1-w^2)) and three tuned constants; on the 250 rows 181 amounts rise (median +0.47%) and 2 statuses change. Committed as ddb9b6b with HANDOVER.md updated, then this log was committed and the branch pushed.
+
+Actions:
+* ran scratchpad rules7.py with BLAST_BASELINE=/tmp/v2_output.csv for first_gap_14=13, first_gap_10=9, first_gap_5=4
+* edited HANDOVER.md (Experiments section, first-gap table); git commit a88a3c3 "docs(handover): record single-period first-gap experiments"
+* created code/evaluation/experiments/estimators.py; ran it with and without --details; git commit 0a6c24d "feat(eval): base-amount estimator experiment"
+* edited code/buyorwait/recurrence.py (_base_amount noisy branch -> mid-range; NOISE_WIDE / NOISE_TIGHT removed); ran the samples scorer, estimators.py, python3 code/main.py twice (byte-identical), validate, python3 code/evaluation/compare.py /tmp/v2_output.csv output.csv (181 rows changed)
+* edited HANDOVER.md (status, rule 5, estimator table, open items, request_19 numbers); git commit ddb9b6b "feat(recurrence): estimate noisy series with the mid-range"
+* git commit of log.txt; git push origin tune-forecast
+
+Context:
+tool=Claude Code
+branch=tune-forecast
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
