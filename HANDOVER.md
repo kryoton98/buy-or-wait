@@ -10,9 +10,10 @@ locally for submission).
   (byte-identical on re-run), ~7 s, zero model calls.
 - `python3 code/evaluation/main.py validate` → VALID (schema, bounds, plan/option match,
   flexible-only spending changes).
-- `python3 code/evaluation/main.py samples` → status 24/25, method 24/25, plan 23/25,
-  changes 23/25, earliest date 24/25, median |error| of `amount_safe_to_pay` 0.8 % (mean 4.6 %).
-  Differences remain on request_06, request_12, request_19.
+- `python3 code/evaluation/main.py samples` → status 25/25, method 25/25, plan 24/25,
+  changes 24/25, earliest date 24/25, median |error| of `amount_safe_to_pay` 0.6 % (mean 2.8 %).
+  Decisions differ on request_12 (changes), request_17 (earliest date) and request_19 (plan);
+  request_05, 10, 14, 15 and 20 differ only in the amount.
 
 ## Architecture (code/buyorwait)
 
@@ -33,8 +34,15 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 2. **Horizon:** monthly items are projected for the request month plus the next two calendar
    months; every-N-day items to R+92 (`PERIODIC_HORIZON_DAYS`). A periodic occurrence landing
    exactly on the request date is excluded; a monthly one is included.
-3. **Three-week chains** (`FIRST_GAP = {21: 15}` in `recurrence.py`) reserve their next
-   occurrence ~15 days out, then continue every 21 days. Pure-21 and pure-15 both scored worse.
+3. **First projected gap** (`FIRST_GAP = {21: 15, 7: 6}` in `recurrence.py`): three-week chains
+   reserve their next occurrence ~15 days out, then continue every 21 days (pure-21 and pure-15 both
+   scored worse); weekly chains reserve theirs 6 days out, then every 7 days, which reproduces the
+   reference's weekly counts on request_04, 06 and 15. Tried and rejected on the samples: weekly
+   gaps of 5 or 4 and a one-day-early gap on every period (amount errors up to 41 % on requests
+   08, 14, 19, 22, 24, 25); skipping occurrences 1–2 days after the request date (cannot add
+   request_04's missing occurrence; the 2-day version scores one flag higher via request_12 but
+   breaks the request_20 and 24 amounts); re-anchoring at the request date (median error 9–11 %);
+   settlement-date cadence and modal-weekday phase (no effect).
 4. **Within-day stage order** (`STAGE` in `forecast.py`): existing pending/scheduled rows →
    every-N-day spending → income → monthly commitments → the request's own payment. The balance
    is checked after each stage.
@@ -63,9 +71,11 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 
 ## Known open items / ideas
 
-- request_06 and request_12: the reference answer prefers a spending-change plan where the
-  forecast says none is needed (and vice versa) — both are within ~8 % of the balance floor, i.e.
-  the variable-spending base estimate is slightly off.
+- request_12: the reference answer uses no spending change where the forecast needs one
+  (`reduce_to:event_1017`). request_06, the mirror case, was a weekly-chain timing difference and
+  is fixed by `FIRST_GAP[7] = 6`. Skipping every-N-day occurrences due within 2 days after the
+  request date also flips request_12 to match, but breaks the request_20 and 24 amounts (67 % and
+  17 % error).
 - request_19 (30-minute investigation on 2026-09-13, no general rule found): the reference's
   28,820 vs our 29,732.13 is a reservation difference, not rounding. Headroom is 199,545 − 92,800
   = 106,745 and the binding checkpoint is 2024-09-14, the day before payday. We reserve 77,012.87

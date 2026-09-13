@@ -43,8 +43,10 @@ NOISE_WIDE, NOISE_TIGHT = 0.28, 0.12
 # Spending that recurs every three weeks keeps its cadence, but the next occurrence is reserved
 # about 15 days after the last one (the reference decisions consistently reserve the next such
 # item before the following payday even when a strict 21-day step would land just after it).
+# Weekly spending is reserved one day early in the same way: 6 days after the last occurrence, then
+# every 7 days.
 FORECAST_PERIOD: dict[int, int] = {}
-FIRST_GAP: dict[int, int] = {21: 15}
+FIRST_GAP: dict[int, int] = {21: 15, 7: 6}
 OUTLIER_LOW, OUTLIER_HIGH = 0.6, 1.5
 
 

@@ -1,7 +1,7 @@
 {
   "requests": 250,
   "output": "/home/wsl/buy-or-wait/output.csv",
-  "seconds": 5.2,
+  "seconds": 4.4,
   "verification_problems": [],
   "llm": {
     "model": "claude-sonnet-4-5",
@@ -78,16 +78,16 @@
     }
   },
   "status_counts": {
-    "affordable_with_plan": 89,
-    "affordable_later": 63,
-    "affordable_now": 51,
-    "not_affordable": 47
+    "affordable_with_plan": 95,
+    "affordable_later": 62,
+    "affordable_now": 47,
+    "not_affordable": 46
   },
   "method_counts": {
-    "full_payment": 67,
-    "wait": 63,
+    "full_payment": 69,
     "installments": 63,
-    "not_recommended": 47,
+    "wait": 62,
+    "not_recommended": 46,
     "partial_payment": 10
   }
 }
