@@ -1,8 +1,8 @@
 # HANDOVER — Buy or Wait? agent
 
-Context transfer from the claude.ai session that built this solution. Read this before changing
-anything under `code/`. The full conversation transcript is in `log.txt` (gitignored, kept
-locally for submission).
+Context transfer from the claude.ai session that built this solution and the Claude Code session
+that tuned it. Read this before changing anything under `code/`. The conversation transcripts are
+in `log.txt` (committed).
 
 ## Status
 
@@ -14,6 +14,30 @@ locally for submission).
   changes 24/25, earliest date 24/25, median |error| of `amount_safe_to_pay` 0.5 % (mean 2.2 %).
   Decisions differ on request_12 (changes), request_17 (earliest date) and request_19 (plan);
   request_05, 10, 13, 14, 15 and 25 differ only in the amount.
+
+## Changes since submission-v1
+
+Tag `submission-v1` is `26dc95c`; `git log --oneline submission-v1..HEAD` lists every commit.
+Kept:
+
+- **Subtotal fix** (`1f886e2`): OCR never takes an item-only subtotal as an event amount; an unknown amount keeps its chain slot but stays out of the base estimate (outputs unchanged).
+- **Weekly first gap** (`92a1d23`): `FIRST_GAP[7] = 6` reserves weekly spending one day early and reproduces the reference counts on request_04, 06 and 15 (sample total 118 → 122).
+- **Mid-range estimator** (`ddb9b6b`): varying series use the mid-range of their regular amounts instead of the noise-interval centre (median error 0.61 % → 0.50 %, mean 2.80 % → 2.24 %).
+- **Plan tolerance 0.003** (`128ba14`): `PLAN_TOL_FRAC` lowered from 0.012 once the estimate lost its implicit margin (request_21 gained, request_12 lost, total stays 122).
+
+Tooling added alongside: `evaluation/compare.py` (blast radius) and `evaluation/experiments/estimators.py`.
+
+Rejected (scores in Experiments, rule 3 and the request_19 item):
+
+- Uniform ×1.03 uplift of variable bases for request_19: changes 23 → 20, earliest 24 → 22.
+- `OUTLIER_LOW = 0.65` or an infeasible-interval fallback for request_19: moved only that sample; the subtotal fix addresses the cause.
+- Weekly first gap of 5 or 4, or one day early on every period: break correct sample amounts (up to 41 % error).
+- Skipping every-N-day items due 1–2 days after the request date: cannot fix request_04; the 2-day version breaks request_20 and 24.
+- Re-anchoring every-N-day chains at the request date: median error 9–11 %.
+- Settlement-date cadence and modal-weekday phase: no effect on any output.
+- Single-period first gaps `14: 13`, `10: 9`, `5: 4`: no total gain; two break a sample amount.
+- Mean, median, mean of the last 3 and the noise-interval width grid as base estimators: higher median error or fewer exact matches than the mid-range.
+- Plan tolerances 0.000, 0.006, 0.009, 0.012 and 0.015: lower total (0.000, 0.009) or a tie at a larger tolerance.
 
 ## Architecture (code/buyorwait)
 
