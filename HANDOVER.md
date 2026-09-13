@@ -102,6 +102,14 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
   more, while request_21 (reference: stop event_1815 and reduce event_1816) matches only at 0.006
   or less, so no single `PLAN_TOL_FRAC` gets both. request_06 was a weekly-chain timing difference,
   fixed by `FIRST_GAP[7] = 6`.
+- household_income_ended (request_42, 50, 58, 154, 230, 238, 262): the message states a "remaining confirmed
+  monthly salary", but the history salary is exactly 62 % of it for all seven users. That is the structure of
+  `commission_pending`, where the stated amount is the pre-split total and the history component is exactly 60 %
+  of it for all nine users, and sample 11 shows the reference follows the history component there. No sample covers
+  this template, so the rules keep the history salary and only stop the ended income. Emitting the stated amount as
+  a permanent `salary_amount` (suggested by the Gemini audit, see `evaluation/llm_audit.md`) was not applied; it
+  would have moved request_42 (affordable later → now), request_50 and request_58 (affordable with spending
+  changes → now).
 - request_19 (30-minute investigation on 2026-09-13, no general rule found): the reference's
   28,820 vs our 29,732.13 is a reservation difference, not rounding. Headroom is 199,545 − 92,800
   = 106,745 and the binding checkpoint is 2024-09-14, the day before payday. We reserve 77,012.87

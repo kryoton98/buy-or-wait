@@ -10,7 +10,7 @@ disagreement was replayed with the model's facts in place of that message's rule
 |---|---|
 | (a) same situation, different label or redundant fact, no forecast effect | 55 |
 | (b) the model extracts a fact the rules deliberately ignore | 32 |
-| (c) facts differ in a way that changes a forecast input | 7 |
+| (c) facts differ in a way that changes a forecast input (history reading kept, see below) | 7 |
 | Total disagreements | 94 |
 
 | Rule kind → model kind | Messages | Category | What differs, and why |
@@ -33,16 +33,19 @@ disagreement was replayed with the model's facts in place of that message's rule
 | receipt_confirmation → regular_salary_confirmed | 1 | (a) | label; `next_only` and `salary_date` on the confirmed salary, no forecast effect |
 
 **(c) Household income ended** (message_30, 37, 42, 119, 180, 187, 203; request_42, 50, 58, 154, 230, 238, 262).
-Each message says one household employment record has ended and states the remaining confirmed monthly salary
-("The remaining confirmed monthly salary is INR 148000"). The rules stop the secondary income series (right) but
-keep the primary salary at its history level, which is exactly 62 % of the stated amount for all seven users
-(91,760 vs 148,000 INR). The model reads the stated salary (right) but adds `income_stopped`, which in this engine
-stops every income series including the remaining salary (wrong: six of the seven requests would become not
-affordable). A message that explicitly confirms the salary outranks history (AGENTS.md §6.3), so this is a rule
-bug. Proposed fix, not applied: the template also emits the stated amount as `salary_amount` (permanent). The 25
-samples do not use this template and score the same (status 25, method 25, plan 24, changes 24, earliest 24,
-median error 0.50 %); on the 250 requests 3 rows change (request_42 affordable later → now, request_50 and
-request_58 affordable with spending changes → now; their safe amounts rise).
+Each message says one household employment record has ended and states a remaining confirmed monthly salary
+("The remaining confirmed monthly salary is INR 148000"). The rules stop the secondary income series and keep the
+primary salary at its history level; the model reads the stated amount and adds `income_stopped`, which in this
+engine stops every income series (six of the seven requests would become not affordable).
+
+A template fix was considered and not applied. The template has the same structure as `commission_pending`: the
+stated amount is the pre-split total, and the history component is exactly 62 % of it for all seven users (91,760
+of 148,000 INR), as it is exactly 60 % for all nine `commission_pending` users (23,256,000 of 38,760,000 IDR for
+sample 11). Sample 11 shows that the reference follows the history component for that structure: the history
+reading matches it exactly and the stated amount does not. No solved sample covers `household_income_ended`, so the
+history reading is kept. The fix (also emit the stated amount as a permanent `salary_amount`) scored the same on the
+25 samples and would have moved three of the 250 rows: request_42 (affordable later → affordable now, safe amount
+30,029.17 → 52,100), request_50 and request_58 (affordable with spending changes → affordable now).
 
 **Also found:** the model returns arrears credits without a date, and `forecast.apply_facts` fails on an undated
 one-time credit. The decision-time fallback only merges model readings for messages the rules cannot classify (none
