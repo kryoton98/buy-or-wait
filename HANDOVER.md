@@ -54,7 +54,10 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
    invoice replaces the freelance series with a single credit; arrears are already settled and are
    not added; a moved payday overrides the next date only; scam prize notices yield no facts.
 9. **Image amounts**: keyword totals (Net Pay / Balance Due / Total paid / Amount payable …)
-   cross-checked against the amount-in-words line. `image_14` is handwritten; its value lives in
+   cross-checked against the amount-in-words line. Item-only subtotals (Item Bill, Subtotal,
+   Total items) are never read; when nothing else is readable the amount stays unknown, and the
+   settled event keeps its slot in its recurring chain but is left out of the base estimate.
+   `image_14` is handwritten; its value lives in
    `code/cache/verified_image_amounts.json` and is replaced by a real vision call when
    `ANTHROPIC_API_KEY` is set.
 
@@ -76,15 +79,12 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
   * (c) Variable bases ~3 % low: a uniform ×1.0318 on noise-estimated debit bases reproduces
     28,820, but as a rule it regresses the other samples (×1.03: changes 23→20, earliest 24→22,
     median error 0.81 %→1.99 %; ×1.015: median 1.30 %).
-  * Partial cause, 312.15 of the 912.13: `image_04` fills event_1700 (settled 2024-09-03, blank
-    amount) with "Item Bill 2854.00" — the order total is cropped out of the image. 2,854 is
-    0.602 × the grocery median, just above `OUTLIER_LOW = 0.6`, so it stays in the estimate, makes
-    the noise interval infeasible and drops the base to the mid-range 4,462.43 (4,774.57 without
-    it). `OUTLIER_LOW = 0.65`, or falling back to hi/(1+w) when the interval is infeasible, fixes
-    only that part: among the samples only request_19 moves (error 3.16 % → 2.08 % / 2.19 %, the six
-    metrics are unchanged); on the 250 requests 0.65 lowers two amounts (request_219, request_264
-    −3 %) and the fallback flips request_78 from full payment with changes to wait. Not adopted:
-    the only supporting evidence is this one sample.
+  * Partial cause, 312.15 of the 912.13 — fixed: `image_04` shows only the item subtotal of
+    event_1700 ("Item Bill 2854.00"; the order total is cropped out), which the OCR reader used to
+    report as the amount, pulling the grocery base down to the mid-range 4,462.43. Subtotals are no
+    longer read: the amount stays unknown, the event keeps its chain slot, the base is 4,774.57 and
+    the safe amount is now 29,419.98 (error 2.08 %). Tuning `OUTLIER_LOW` to 0.65 or an
+    infeasible-interval fallback would also have hidden the value, but only this sample supported them.
   * Still unexplained: ~600. With groceries at 4,774.57 the four noise-estimated items sum to
     22,900.02, while the reference implies 23,500 for them (same item set, shopping at 6,080).
 - The LLM layer is wired but unexercised; enabling it (`ANTHROPIC_API_KEY`) only affects messages

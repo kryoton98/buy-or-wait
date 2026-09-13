@@ -1,7 +1,7 @@
 {
   "requests": 250,
   "output": "/home/wsl/buy-or-wait/output.csv",
-  "seconds": 4.0,
+  "seconds": 5.2,
   "verification_problems": [],
   "llm": {
     "model": "claude-sonnet-4-5",
@@ -25,8 +25,8 @@
       "how": "cash paid -> Cash Paid: 41272,00"
     },
     "event_1700": {
-      "amount": 2854.0,
-      "how": "item bill -> Item Bill 2854.00"
+      "amount": null,
+      "how": "only a partial subtotal is readable (Item Bill 2854.00); amount unknown"
     },
     "event_1786": {
       "amount": 704.05,

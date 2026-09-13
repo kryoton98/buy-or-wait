@@ -191,9 +191,9 @@ def apply_facts(st: State, ds: Dataset) -> None:
             # gig payouts / commissions / bonuses / prizes that are not confirmed: exclude those series
             which = f.get("scope", "variable")
             for s in income:
-                if which == "all_variable" and (max(s.amounts) - min(s.amounts) > 1e-9 or s.kind == "periodic"):
+                if which == "all_variable" and (s.spread() > 1e-9 or s.kind == "periodic"):
                     s.stopped = True
-                elif which == "commission" and s is not primary and (max(s.amounts) - min(s.amounts) > 1e-9):
+                elif which == "commission" and s is not primary and s.spread() > 1e-9:
                     s.stopped = True
                 elif which == "secondary" and s is not primary:
                     s.stopped = True

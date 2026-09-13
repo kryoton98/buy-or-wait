@@ -80,6 +80,11 @@ class Series:
         sched = f"day {self.day}" if self.kind == "monthly" else f"every {self.period}d"
         return f"{self.key} {self.direction} {self.kind} ({sched}) last={self.last_date} amt={self.amount:,.2f} n={len(self.amounts)} {self.flexibility}"
 
+    def spread(self) -> float:
+        """Range of the known amounts (events whose amount is unknown are ignored)."""
+        known = [a for a in self.amounts if not pd.isna(a)]
+        return max(known) - min(known) if known else 0.0
+
 
 def _mode(xs):
     return Counter(xs).most_common(1)[0][0]
@@ -227,10 +232,12 @@ def detect_series(hist: pd.DataFrame, home: str, convert, excluded_event_ids: se
                 med = float(sel.amount_home.median())
                 sel = sel.assign(_dev=(sel.amount_home - med).abs()).sort_values("_dev").drop_duplicates("settlement_date", keep="first").drop(columns="_dev").sort_values(["settlement_date", "event_id"])
             # amounts far outside the noise band (an unpaid-leave month, a one-off bulk purchase) keep
-            # their place in the schedule but do not influence the base estimate
+            # their place in the schedule but do not influence the base estimate; neither do events whose
+            # amount is unknown (blank, with no readable evidence)
             amounts = sel.amount_home.tolist()
-            mask = regular_mask(amounts)
-            est_amounts = [x for x, ok in zip(amounts, mask) if ok] if sum(mask) >= 3 else amounts
+            known = [x for x in amounts if not pd.isna(x)]
+            mask = regular_mask(known)
+            est_amounts = [x for x, ok in zip(known, mask) if ok] if sum(mask) >= 3 else known
             last = sel.iloc[-1]
             day = _mode([d.day for d in sel.settlement_date]) if kind == "monthly" else None
             key = cat if idx == 0 else f"{cat}#{idx + 1}"

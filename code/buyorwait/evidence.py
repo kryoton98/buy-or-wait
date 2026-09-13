@@ -211,8 +211,11 @@ def read_message(row: pd.Series, home: str) -> MessageReading:
 # ----------------------------------------------------------------------------
 KEYWORDS = [  # in priority order
     r"net pay", r"total paid", r"balance due", r"amount due till", r"grand total", r"total amount received",
-    r"amount payable", r"total bill amount", r"^total\b", r"cash paid", r"item bill", r"amount due", r"^balance\b",
+    r"amount payable", r"total bill amount", r"^total\b", r"cash paid", r"amount due", r"^balance\b",
 ]
+# Item-only subtotals ("Item Bill", "Item Total", "Subtotal", "Total items") leave out delivery fees, taxes and
+# discounts, so they are never an event amount: when nothing else is readable the amount stays unknown.
+SUBTOTAL_RE = re.compile(r"\bsub[\s-]?total\b|\bitems?\s*(?:\(s\)\s*)?(?:bill|total|value|amount)\b|\btotal\s+items?\b", re.I)
 NUM_RE = re.compile(r"(?<![\d.])(\d{1,3}(?:[,.]\d{2,3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)")
 FILLER = {":", "=", "-", "(rs)", "rs", "rs.", "inr", "idr", "usd", "eur", "zar", "$", "%", "f", "@", "()", "amount", "rupees", "(%)", "*"}
 
@@ -298,14 +301,17 @@ def amount_from_ocr(texts: list[str]) -> tuple[Optional[float], str]:
         for lines in lined:
             for l in lines:
                 m = rx.search(l)
-                if m:
+                if m and not SUBTOTAL_RE.search(l):
                     v = _number_after(m.end(), l)
                     if v is not None and v > 0:
                         return v, f"{kw} -> {l}"
         for lines in lined:
             for i, l in enumerate(lines):
-                if rx.search(l):
-                    for nxt in lines[i + 1:i + 3]:
+                if rx.search(l) and not SUBTOTAL_RE.search(l):
+                    for j in range(i + 1, min(i + 3, len(lines))):
+                        if SUBTOTAL_RE.search(lines[j - 1]):
+                            break  # a number printed under a subtotal label is that subtotal
+                        nxt = lines[j]
                         toks = nxt.split()
                         nums = [x for x in toks if NUM_RE.fullmatch(x.strip("%$"))]
                         others = [x for x in toks if x.strip().lower() not in FILLER and not NUM_RE.fullmatch(x.strip("%$"))]
@@ -313,6 +319,9 @@ def amount_from_ocr(texts: list[str]) -> tuple[Optional[float], str]:
                             v = _parse_receipt_number(nums[0])
                             if v is not None and v > 0:
                                 return v, f"{kw} (next line) -> {nxt}"
+    subtotal = next((l for lines in lined for l in lines if SUBTOTAL_RE.search(l)), None)
+    if subtotal:
+        return None, f"only a partial subtotal is readable ({subtotal}); amount unknown"
     return None, "no keyword total found"
 
 
