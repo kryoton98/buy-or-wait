@@ -102,6 +102,22 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 - `code/evaluation/decisions_debug.jsonl` holds per-request series, facts, candidates and notes —
   the fastest way to diagnose a wrong decision.
 
+## Experiments
+
+Scored with `evaluation/main.py samples` and `evaluation/compare.py` against the previous output, and
+kept here so they are not repeated.
+
+**First projected gap, one period at a time** (2026-09-13), each on top of
+`FIRST_GAP = {21: 15, 7: 6}` (baseline: status 25, method 25, plan 24, changes 24, earliest 24,
+median error 0.61 %, mean 2.80 %, 19 amounts within 2 %). None adopted: no total improves and two
+break a sample amount that was right.
+
+| variant | status | method | plan | changes | earliest | median | mean | within 2 % | blast radius on the 250 |
+|---|---|---|---|---|---|---|---|---|---|
+| `14: 13` | 25 | 25 | 24 | 24 | 24 | 0.61 % | 2.80 % | 19 | 1 row (request_212 amount −36 %) |
+| `10: 9` | 25 | 25 | 24 | 24 | 24 | 0.61 % | 3.52 % | 18 | 11 rows, 3 statuses; request_24 error 0.9 % → 19 % |
+| `5: 4` | 25 | 25 | 24 | 24 | 24 | 0.61 % | 4.41 % | 18 | 13 rows, no status; request_25 error 1.0 % → 41 % |
+
 ## Conventions to keep
 
 - No hardcoded labels, no organizer-only files, secrets from environment variables only.
