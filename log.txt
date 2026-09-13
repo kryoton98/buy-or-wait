@@ -451,3 +451,28 @@ branch=gemini-provider
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T02:34:20+00:00] Household fix not applied: recorded in llm_audit triage and HANDOVER
+
+User Prompt (verbatim, secrets redacted):
+In the Triage section of llm_audit.md and in HANDOVER.md's open items, record why the
+household fix was not applied: the template has the same structure as commission_pending
+(stated amount = pre-split total; the history component is exactly 62 % of it for all
+seven users, as 60 % was for the six commission users), and sample 11 showed the reference
+follows the history component for that structure; with no sample covering this template,
+the history reading is kept. Note the three rows it would have moved. Commit and push.
+
+Agent Response Summary:
+Verified the ratios before recording them, without model calls: the history salary is exactly 62% of the stated amount for all seven household_income_ended users and exactly 60% for all nine commission_pending users (the six the model kept as commission_pending plus the three it labelled salary_increase, including sample 11). Rewrote the (c) paragraph of the Triage section in code/evaluation/llm_audit.md and added a household_income_ended item to HANDOVER.md's open items: the template has the commission_pending structure (stated amount = pre-split total), sample 11 shows the reference follows the history component, and no sample covers the template, so the history reading is kept; the fix would have moved request_42 (affordable later to now), request_50 and request_58 (affordable with spending changes to now). Committed as df91d17 with this log entry on gemini-provider and pushed after the key scans.
+
+Actions:
+* wrote and ran scratchpad ratios.py (history salary vs stated amount for the 9 commission_pending and 7 household_income_ended messages)
+* edited code/evaluation/llm_audit.md (Triage) and HANDOVER.md (Known open items)
+* key scans (pattern and exact value, never printed); git commit df91d17 "docs: record why the household-income template fix was not applied"; git commit of log.txt; git push
+
+Context:
+tool=Claude Code
+branch=gemini-provider
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
