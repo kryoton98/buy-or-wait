@@ -476,3 +476,25 @@ branch=gemini-provider
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T20:58:48+00:00] Replaced code/README.md with a full project write-up (not committed)
+
+User Prompt (verbatim, secrets redacted):
+now you need to replace the readme and write one that explains what i did altogether and it should be something like this : # Multi-Domain Support Triage Agent
+[pasted example README of about 250 lines for a "Multi-Domain Support Triage Agent" built for HackerRank Orchestrate May 2026 (sections: Architecture, Why this design?, Project structure, Quickstart, Output schema, Key components, Evaluation results, Requirements, Environment variables, Chat transcript logging, Design decisions & trade-offs, Known limitations) omitted here as full document contents, per AGENTS.md section 5.4]
+... but donot commit this on github
+
+Agent Response Summary:
+Replaced code/README.md (the solution README packaged in code.zip; the root README.md is the challenge starter and was left alone) with a full write-up in the structure of the example: architecture diagram of the six pipeline stages plus the optional model layer, why rules decide and the model only reads and audits, project structure, quickstart (install, --llm off run, validate and samples, compare.py blast radius, optional Gemini --llm-audit, other options), output schema and value tables, key components (evidence templates, receipt OCR and the subtotal rule, recurrence and forecast rules, planner and verification, the Anthropic/Gemini client), the real sample-score output and the score progression from submission-v1 through the four kept changes, the audit and token usage of the final run with the triage and the household decision, requirements, environment variables, transcript logging, design decisions and known limitations. Facts were taken from the code, a fresh validate (VALID) and samples run (25/25, 25/25, 24/25, 24/25, 24/25, median 0.50%, mean 2.24%), the CLI help texts, run_summary.json and the git remotes. As requested, nothing was committed or pushed; this log entry was appended locally.
+
+Actions:
+* ran git remote -v, git ls-files, python3 code/evaluation/main.py validate and samples, the --help of code/main.py, code/evaluation/main.py, compare.py and experiments/estimators.py; read code/README.md and code/buyorwait/data.py
+* rewrote code/README.md (not committed)
+* appended this entry to log.txt (not committed)
+
+Context:
+tool=Claude Code
+branch=main
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
