@@ -11,9 +11,10 @@ writing it.
 
 ```bash
 pip install -r code/requirements.txt          # pandas, numpy
-python3 code/main.py                          # writes <repo root>/output.csv (~10 s)
+python3 code/main.py                          # writes <repo root>/output.csv (~5 s)
 python3 code/evaluation/main.py validate      # contract checks on output.csv
 python3 code/evaluation/main.py samples       # decide + score the 25 solved samples
+python3 code/evaluation/compare.py BEFORE.csv AFTER.csv   # what changed between two outputs
 ```
 
 Options: `--dataset <dir>`, `--output <file>`, `--requests samples`, `--llm off`, `--quiet`.
@@ -41,28 +42,35 @@ request_payment_options.csv ─► installment schedules                        
      (`from_currency -> to_currency`).
    * Recurrence is detected per category and direction: fixed day-of-month items (rent,
      utilities, subscriptions, loans, payroll) and every-N-day spending (groceries, transport,
-     dining). Same-date duplicates and outliers (bulk purchases, an unpaid-leave payslip) keep
-     their slot in the schedule but do not distort the amount estimate. Series with no
-     occurrence in the last cycle, "final payroll" rows and ended contracts are treated as
-     stopped.
-   * Variable amounts are estimated from the noise band observed in history; reducible items
-     use their `minimum_allowed_amount` as an anchor.
+     dining). Same-date duplicates, outliers (bulk purchases, an unpaid-leave payslip) and settled
+     events whose amount is unknown keep their slot in the schedule but do not affect the amount
+     estimate. Series with no occurrence in the last cycle, "final payroll" rows and ended
+     contracts are treated as stopped.
+   * Base amounts: a constant series keeps its value and a level change its new level; reducible
+     items use `minimum_allowed_amount / ratio` as an anchor; any other varying series uses the
+     mid-range of its regular amounts, the unbiased estimate of the centre of the uniform noise
+     these series show, whatever the width of the band.
    * Forecast: monthly items for the request month and the two following calendar months,
-     every-N-day items to day 92 (three-week items reserve their next occurrence ~15 days out).
-     Within a day: existing pending/scheduled rows → periodic spending → income → monthly
-     items → the request payment; the balance is checked after each stage.
+     every-N-day items to day 92. The first projected step is shortened for three-week and weekly
+     chains (`FIRST_GAP = {21: 15, 7: 6}`), after which each chain keeps its cadence; an
+     every-N-day item due on the request date itself is not reserved. Within a day: existing
+     pending/scheduled rows → periodic spending → income → monthly items → the request payment;
+     the balance is checked after each stage.
 2. **Evidence** (`buyorwait/evidence.py`) – every message is classified into one of 30
    templates (salary raise/cut/date change, first salary, contract ended, commission or bonus
    pending, gig payout pending, confirmed invoice, rent increase, refunds, disputes, scam
    prizes, …) and turned into facts such as `salary_amount`, `salary_date`, `income_stopped`,
    `unconfirmed_income`, `one_time_credit`, `rent_change`. Embedded instructions are never
    executed. Blank amounts are read from the linked image with OCR (keyword totals such as
-   *Net Pay*, *Balance Due*, *Total paid*, cross-checked against the amount-in-words line);
-   OCR text is cached in `cache/ocr_cache.json` so the run also works without tesseract. One
-   handwritten bill is shipped as a verified value in `cache/verified_image_amounts.json`.
-   When `ANTHROPIC_API_KEY` is set, `LLMExtractor` sends unreadable messages/images to the
-   Anthropic Messages API with the JSON-schema prompts in `prompts/` (temperature 0, cached,
-   token-counted); results are validated before use. The final run needed no such call.
+   *Net Pay*, *Balance Due*, *Total paid*, cross-checked against the amount-in-words line).
+   Item-only subtotals (*Item Bill*, *Item Total*, *Subtotal*, *Total items*) are never taken as
+   the amount: when nothing else is readable the amount stays unknown. OCR text is cached in
+   `cache/ocr_cache.json` so the run also works without tesseract. One handwritten bill is
+   shipped as a verified value in `cache/verified_image_amounts.json`. When `ANTHROPIC_API_KEY`
+   is set, `LLMExtractor` sends unreadable messages and images (on this dataset the subtotal-only
+   receipt and the handwritten bill) to the Anthropic Messages API with the JSON-schema prompts in
+   `prompts/` (temperature 0, cached, token-counted); results are validated before use. The final
+   run made no model call.
 3. **Planning** (`buyorwait/planner.py`) – `amount_safe_to_pay` = largest payment today that
    keeps every future checkpoint ≥ minimum (no spending changes); `earliest_date_for_full_payment`
    = first day a single full payment is safe. Candidates: full payment today (with up to three
@@ -77,15 +85,23 @@ request_payment_options.csv ─► installment schedules                        
 4. **Verification** – bounds on `amount_safe_to_pay`, `affordable_now ⇒ earliest = request_date`,
    partial = exactly two payments summing to the request, installment schedule byte-equal to the
    option, ≤ 3 changes on flexible events only, and a re-simulation of the chosen plan. A small
-   forecast-uncertainty allowance (0.3 % of the reserved outflow) is applied only when judging plan
-   feasibility; the two numeric outputs never use it.
+   forecast-uncertainty allowance (`PLAN_TOL_FRAC`, 0.3 % of the reserved outflow) is applied only
+   when judging plan feasibility; the two numeric outputs never use it.
 
 ## Evaluation
 
 `python3 code/evaluation/main.py samples` re-decides the 25 solved samples with exactly the
-production pipeline: 24/25 statuses, 24/25 methods, 23/25 plans, 23/25 change sets, 24/25
-earliest dates; median absolute error of `amount_safe_to_pay` 0.8 %. The remaining differences
-are boundary cases where the true variable-spending base is not observable from history.
+production pipeline: 25/25 statuses, 25/25 methods, 24/25 plans, 24/25 change sets and 24/25
+earliest dates; median absolute error of `amount_safe_to_pay` 0.50 %, mean 2.24 %. The remaining
+decision differences are request_12 (change set), request_17 (earliest date) and request_19
+(partial-payment split); `HANDOVER.md` records what was tried for each.
+
+`python3 code/evaluation/compare.py BEFORE.csv AFTER.csv` compares two outputs: rows that differ
+per column (formatting-only differences counted separately), how far `amount_safe_to_pay` moved,
+status and method transition matrices, and every changed request_id. It was used to judge the
+blast radius of each change. `code/evaluation/experiments/` holds reproducible experiments;
+`estimators.py` scores alternative base-amount estimators on the samples.
+
 `evaluation/run_summary.json` and `evaluation/decisions_debug.jsonl` are produced by every run
 and contain, per request, the detected series, applied facts, candidate plans and notes.
 Token usage of the final run is in `evaluation/usage_report.md`.
@@ -97,13 +113,20 @@ code/
 ├── main.py                     CLI entry point
 ├── buyorwait/
 │   ├── data.py                 CSV loading, FX conversion
-│   ├── recurrence.py           series detection and projection
+│   ├── recurrence.py           series detection, base amounts, projection
 │   ├── forecast.py             state reconstruction, evidence application, simulation
 │   ├── evidence.py             message templates, OCR, optional LLM/vision layer
 │   ├── planner.py              candidates, ranking, explanations, verification
 │   └── pipeline.py             orchestration and debug output
 ├── prompts/                    LLM prompts (message / image extraction)
 ├── cache/                      OCR cache, verified image value, LLM cache (when used)
-├── evaluation/                 validator + sample scorer, run summary, usage report
+├── evaluation/
+│   ├── main.py                 validator + sample scorer
+│   ├── compare.py              diff of two output.csv files
+│   ├── experiments/
+│   │   └── estimators.py       base-amount estimator comparison on the samples
+│   ├── run_summary.json        counters of the last run
+│   ├── decisions_debug.jsonl   per-request series, facts, candidates and notes
+│   └── usage_report.md         model calls, tokens and cost of the final run
 └── requirements.txt
 ```
