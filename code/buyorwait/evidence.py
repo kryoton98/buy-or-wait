@@ -7,11 +7,11 @@ knows how to apply. Three layers are used, in order:
 
 1. a deterministic, bilingual (English / Indonesian) template classifier;
 2. OCR (tesseract) for receipts, payslips and bills that carry a blank amount;
-3. an optional LLM pass (Anthropic Messages API, enabled with
-   ``ANTHROPIC_API_KEY``) that is only consulted for messages the classifier
-   cannot place or images the OCR cannot read. Every LLM result is validated
-   against a strict schema and cached under ``cache/`` so a re-run is
-   deterministic and free.
+3. an optional LLM pass (Anthropic Messages API with ``ANTHROPIC_API_KEY``,
+   otherwise Google Gemini with ``GEMINI_API_KEY``) that is only consulted for
+   messages the classifier cannot place or images the OCR cannot read, and by
+   the report-only ``--llm-audit``. Every LLM result is validated against a
+   strict schema and cached under ``cache/`` so a re-run is deterministic and free.
 
 Embedded instructions inside a message (e.g. "pay the release charge today")
 are never executed; only the financial facts are extracted.
@@ -24,6 +24,9 @@ import json
 import os
 import re
 import subprocess
+import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -416,14 +419,51 @@ def read_image_amount(path: Path, cache: Optional[OCRCache] = None) -> tuple[Opt
 
 
 # ----------------------------------------------------------------------------
-# optional LLM layer (Anthropic Messages API)
+# optional LLM layer (Anthropic Messages API or Google Gemini generateContent)
 # ----------------------------------------------------------------------------
-class LLMExtractor:
-    """Thin client around the Anthropic Messages API with a JSON cache and token accounting."""
+ANTHROPIC_MODEL = "claude-sonnet-4-5"
+# the fast, low-cost model recommended on the Gemini models page (checked 2026-09-13)
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_THINKING_LEVEL = "minimal"
+# Gemini free-tier limits are per project and shown only in AI Studio; published guides quote 10-15 requests per
+# minute for Flash-Lite. Requests are therefore spaced (BUYORWAIT_LLM_MIN_INTERVAL overrides, in seconds), and a 429
+# or 503 is retried after the server's RetryInfo delay or an exponential backoff.
+GEMINI_MIN_INTERVAL = 4.0
+RETRY_STATUSES = (429, 503)
+MAX_RETRIES = 6
+MAX_BACKOFF = 60.0
 
-    def __init__(self, cache_dir: Path, prompts_dir: Path, model: str = "claude-sonnet-4-5"):
-        self.key = os.environ.get("ANTHROPIC_API_KEY")
-        self.model = os.environ.get("BUYORWAIT_MODEL", model)
+
+def _retry_delay(err: urllib.error.HTTPError, attempt: int) -> float:
+    """Seconds to wait before retrying: the server's Retry-After or RetryInfo when given, else 2, 4, 8 ... s."""
+    try:
+        if err.headers and err.headers.get("Retry-After"):
+            return float(err.headers["Retry-After"])
+        for detail in json.loads(err.read().decode() or "{}").get("error", {}).get("details", []):
+            delay = str(detail.get("retryDelay", ""))
+            if str(detail.get("@type", "")).endswith("RetryInfo") and delay.endswith("s"):
+                return float(delay[:-1])
+    except (ValueError, AttributeError, TypeError):
+        pass
+    return min(MAX_BACKOFF, 2.0 ** (attempt + 1))
+
+
+class LLMExtractor:
+    """Thin client for the Anthropic Messages API or Google Gemini, with one JSON cache and token accounting.
+
+    Anthropic is used when ANTHROPIC_API_KEY is set, otherwise Gemini when GEMINI_API_KEY is set; BUYORWAIT_MODEL
+    overrides the provider's default model.
+    """
+
+    def __init__(self, cache_dir: Path, prompts_dir: Path, model: Optional[str] = None):
+        anthropic_key, gemini_key = os.environ.get("ANTHROPIC_API_KEY"), os.environ.get("GEMINI_API_KEY")
+        if gemini_key and not anthropic_key:
+            self.provider, self.key, default_model, interval = "google", gemini_key, GEMINI_MODEL, GEMINI_MIN_INTERVAL
+        else:
+            self.provider, self.key, default_model, interval = "anthropic", anthropic_key, ANTHROPIC_MODEL, 0.0
+        self.model = os.environ.get("BUYORWAIT_MODEL") or model or default_model
+        self.min_interval = float(os.environ.get("BUYORWAIT_LLM_MIN_INTERVAL", interval))
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = cache_dir / "llm_cache.json"
@@ -432,7 +472,11 @@ class LLMExtractor:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.thinking_tokens = 0
         self.cache_hits = 0
+        self.retries = 0
+        self._last_request = 0.0
+        self._gemini_thinking = True
 
     @property
     def enabled(self) -> bool:
@@ -445,28 +489,81 @@ class LLMExtractor:
             return self.cache[key]["text"]
         if not self.enabled:
             return None
-        import urllib.request
-
-        body = json.dumps({"model": self.model, "max_tokens": 600, "temperature": 0, "system": system,
-                           "messages": [{"role": "user", "content": content}]}).encode()
-        req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body, headers={
-            "content-type": "application/json", "x-api-key": self.key, "anthropic-version": "2023-06-01"})
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode())
-        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
-        usage = data.get("usage", {})
+        if self.provider == "google":
+            text, usage, input_tokens, output_tokens = self._call_gemini(system, content)
+        else:
+            text, usage, input_tokens, output_tokens = self._call_anthropic(system, content)
         self.calls += 1
-        self.input_tokens += int(usage.get("input_tokens", 0))
-        self.output_tokens += int(usage.get("output_tokens", 0))
-        self.cache[key] = {"text": text, "usage": usage, "model": self.model}
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+        self.cache[key] = {"text": text, "usage": usage, "model": self.model, "provider": self.provider}
         self.cache_file.write_text(json.dumps(self.cache, indent=1))
         return text
+
+    def _call_anthropic(self, system: str, content: list) -> tuple[str, dict, int, int]:
+        data = self._post("https://api.anthropic.com/v1/messages",
+                          {"model": self.model, "max_tokens": 600, "temperature": 0, "system": system,
+                           "messages": [{"role": "user", "content": content}]},
+                          {"content-type": "application/json", "x-api-key": self.key, "anthropic-version": "2023-06-01"})
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        usage = data.get("usage", {})
+        return text, usage, int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))
+
+    def _call_gemini(self, system: str, content: list) -> tuple[str, dict, int, int]:
+        parts = [{"inlineData": {"mimeType": b["source"]["media_type"], "data": b["source"]["data"]}}
+                 if b.get("type") == "image" else {"text": b.get("text", "")} for b in content]
+        config = {"temperature": 0, "responseMimeType": "application/json", "maxOutputTokens": 2048}
+        if self._gemini_thinking:
+            config["thinkingConfig"] = {"thinkingLevel": GEMINI_THINKING_LEVEL}
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": parts}],
+                "generationConfig": config}
+        url, headers = GEMINI_URL.format(model=self.model), {"content-type": "application/json", "x-goog-api-key": self.key}
+        try:
+            data = self._post(url, body, headers)
+        except urllib.error.HTTPError as err:
+            if err.code != 400 or "thinkingConfig" not in config or b"thinking" not in err.read().lower():
+                raise
+            config.pop("thinkingConfig")
+            data = self._post(url, body, headers)
+            self._gemini_thinking = False  # the model rejects an explicit thinking level: keep its default from now on
+        candidate = (data.get("candidates") or [{}])[0]
+        text = "".join(p.get("text", "") for p in candidate.get("content", {}).get("parts", []) if not p.get("thought"))
+        usage = data.get("usageMetadata", {})
+        thinking = int(usage.get("thoughtsTokenCount", 0))
+        self.thinking_tokens += thinking
+        # thinking tokens are billed as output tokens
+        return text, usage, int(usage.get("promptTokenCount", 0)), int(usage.get("candidatesTokenCount", 0)) + thinking
+
+    def _post(self, url: str, body: dict, headers: dict) -> dict:
+        """POST JSON, keeping the minimum spacing between requests and retrying 429/503 with backoff."""
+        payload = json.dumps(body).encode()
+        for attempt in range(MAX_RETRIES + 1):
+            wait = self.min_interval - (time.monotonic() - self._last_request)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request = time.monotonic()
+            try:
+                with urllib.request.urlopen(urllib.request.Request(url, data=payload, headers=headers), timeout=120) as resp:
+                    return json.loads(resp.read().decode())
+            except urllib.error.HTTPError as err:
+                if err.code not in RETRY_STATUSES or attempt == MAX_RETRIES:
+                    raise
+                delay = _retry_delay(err, attempt)
+                if delay > MAX_BACKOFF:
+                    raise  # e.g. a daily quota: waiting it out would stall the run
+                self.retries += 1
+                time.sleep(delay)
+        raise AssertionError("unreachable")
 
     def _prompt(self, name: str) -> str:
         return (self.prompts_dir / name).read_text()
 
+    def read_message_text(self, text: str) -> Optional[str]:
+        """Raw model output for one message (None without a key and without a cached answer)."""
+        return self._call(self._prompt("message_extraction.md"), [{"type": "text", "text": text}])
+
     def read_message(self, text: str) -> Optional[dict]:
-        out = self._call(self._prompt("message_extraction.md"), [{"type": "text", "text": text}])
+        out = self.read_message_text(text)
         return _parse_json(out) if out else None
 
     def read_image(self, path: Path, description: str) -> Optional[dict]:
@@ -479,8 +576,9 @@ class LLMExtractor:
         return _parse_json(out) if out else None
 
     def usage(self) -> dict:
-        return dict(model=self.model, calls=self.calls, cache_hits=self.cache_hits, input_tokens=self.input_tokens,
-                    output_tokens=self.output_tokens, enabled=self.enabled)
+        return dict(provider=self.provider, model=self.model, calls=self.calls, cache_hits=self.cache_hits,
+                    input_tokens=self.input_tokens, output_tokens=self.output_tokens, thinking_tokens=self.thinking_tokens,
+                    retries=self.retries, enabled=self.enabled)
 
 
 def _parse_json(text: str) -> Optional[dict]:
@@ -494,15 +592,19 @@ def _parse_json(text: str) -> Optional[dict]:
 LLM_KINDS = {k for k, _, _ in TEMPLATES} | {"unknown"}
 
 
-def merge_llm_message(reading: MessageReading, llm: Optional[dict]) -> MessageReading:
-    """Use the LLM reading only when the rules found nothing and the LLM output is well-formed."""
-    if reading.kind != "unknown" or not llm or llm.get("kind") not in LLM_KINDS:
-        return reading
+LLM_FACT_TYPES = {"salary_amount", "salary_date", "income_stopped", "unconfirmed_income", "one_time_credit",
+                  "one_time_debit", "rent_change", "internal_transfer"}
+
+
+def llm_message_reading(message_id: str, llm: Optional[dict]) -> Optional[MessageReading]:
+    """A validated MessageReading from the model's JSON, or None when it is not an object with a known kind."""
+    if not isinstance(llm, dict) or llm.get("kind") not in LLM_KINDS:
+        return None
     facts = []
     for f in llm.get("facts", []) or []:
-        if not isinstance(f, dict) or f.get("type") not in {"salary_amount", "salary_date", "income_stopped", "unconfirmed_income",
-                                                              "one_time_credit", "one_time_debit", "rent_change", "internal_transfer"}:
+        if not isinstance(f, dict) or f.get("type") not in LLM_FACT_TYPES:
             continue
+        f = dict(f)
         if "date" in f and f["date"]:
             try:
                 f["date"] = date.fromisoformat(str(f["date"])[:10])
@@ -514,4 +616,11 @@ def merge_llm_message(reading: MessageReading, llm: Optional[dict]) -> MessageRe
             except (TypeError, ValueError):
                 continue
         facts.append(f)
-    return MessageReading(reading.message_id, str(llm["kind"]), facts, str(llm.get("summary", ""))[:200], source="llm")
+    return MessageReading(message_id, str(llm["kind"]), facts, str(llm.get("summary", ""))[:200], source="llm")
+
+
+def merge_llm_message(reading: MessageReading, llm: Optional[dict]) -> MessageReading:
+    """Use the LLM reading only when the rules found nothing and the LLM output is well-formed."""
+    if reading.kind != "unknown":
+        return reading
+    return llm_message_reading(reading.message_id, llm) or reading

@@ -15,10 +15,11 @@ python3 code/main.py                          # writes <repo root>/output.csv (~
 python3 code/evaluation/main.py validate      # contract checks on output.csv
 python3 code/evaluation/main.py samples       # decide + score the 25 solved samples
 python3 code/evaluation/compare.py BEFORE.csv AFTER.csv   # what changed between two outputs
+python3 code/main.py --llm-audit              # also read every message with the model (needs an API key)
 ```
 
-Options: `--dataset <dir>`, `--output <file>`, `--requests samples`, `--llm off`, `--quiet`.
-Secrets are read from the environment only (`ANTHROPIC_API_KEY`); nothing is hard-coded, no
+Options: `--dataset <dir>`, `--output <file>`, `--requests samples`, `--llm off`, `--llm-audit`, `--quiet`.
+Secrets are read from the environment only (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`); nothing is hard-coded, no
 organizer-only file is used, and the run is deterministic (a second run produces a byte-identical
 `output.csv`).
 
@@ -66,11 +67,16 @@ request_payment_options.csv ─► installment schedules                        
    Item-only subtotals (*Item Bill*, *Item Total*, *Subtotal*, *Total items*) are never taken as
    the amount: when nothing else is readable the amount stays unknown. OCR text is cached in
    `cache/ocr_cache.json` so the run also works without tesseract. One handwritten bill is
-   shipped as a verified value in `cache/verified_image_amounts.json`. When `ANTHROPIC_API_KEY`
-   is set, `LLMExtractor` sends unreadable messages and images (on this dataset the subtotal-only
-   receipt and the handwritten bill) to the Anthropic Messages API with the JSON-schema prompts in
-   `prompts/` (temperature 0, cached, token-counted); results are validated before use. The final
-   run made no model call.
+   shipped as a verified value in `cache/verified_image_amounts.json`. When an API key is set,
+   `LLMExtractor` sends unreadable messages and images (on this dataset the subtotal-only receipt
+   and the handwritten bill) to the model with the JSON-schema prompts in `prompts/` (temperature 0,
+   JSON output, cached in `cache/llm_cache.json`, token-counted); results are validated before use.
+   `ANTHROPIC_API_KEY` selects the Anthropic Messages API; otherwise `GEMINI_API_KEY` selects Google
+   Gemini (`gemini-3.5-flash-lite` by default, `BUYORWAIT_MODEL` overrides) through the REST
+   `generateContent` endpoint, with requests spaced 4 s apart (`BUYORWAIT_LLM_MIN_INTERVAL`) and
+   429/503 responses retried with backoff. `--llm-audit` reads every message with the model after the
+   decisions are written and reports its agreement with the rules in `evaluation/llm_audit.md`; it
+   never changes a decision.
 3. **Planning** (`buyorwait/planner.py`) – `amount_safe_to_pay` = largest payment today that
    keeps every future checkpoint ≥ minimum (no spending changes); `earliest_date_for_full_payment`
    = first day a single full payment is safe. Candidates: full payment today (with up to three
@@ -117,7 +123,8 @@ code/
 │   ├── forecast.py             state reconstruction, evidence application, simulation
 │   ├── evidence.py             message templates, OCR, optional LLM/vision layer
 │   ├── planner.py              candidates, ranking, explanations, verification
-│   └── pipeline.py             orchestration and debug output
+│   ├── pipeline.py             orchestration and debug output
+│   └── llm_audit.py            model-vs-rules audit of the message readings (report only)
 ├── prompts/                    LLM prompts (message / image extraction)
 ├── cache/                      OCR cache, verified image value, LLM cache (when used)
 ├── evaluation/

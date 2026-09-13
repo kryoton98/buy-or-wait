@@ -23,8 +23,8 @@ class Agent:
         self.code_root = code_root
         self.llm = LLMExtractor(code_root / "cache", code_root / "prompts")
         self.ocr = OCRCache(code_root / "cache" / "ocr_cache.json")
-        if use_llm == "off":
-            self.llm.key = None
+        # decisions consult the model only in "auto" mode; the key stays available to an explicit --llm-audit
+        self.use_llm = use_llm != "off" and self.llm.enabled
         self.verbose = verbose
         self.readings: dict[str, MessageReading] = {}
         self.image_amounts: dict[str, float] = {}
@@ -41,14 +41,14 @@ class Agent:
         home_by_user = self.ds.profiles.set_index("user_id").home_currency.to_dict()
         for _, row in self.ds.messages.iterrows():
             rd = read_message(row, home_by_user.get(row.user_id, ""))
-            if rd.kind == "unknown" and self.llm.enabled:
+            if rd.kind == "unknown" and self.use_llm:
                 rd = merge_llm_message(rd, self.llm.read_message(str(row.message_text)))
             self.readings[row.message_id] = rd
         for _, row in self.ds.images.iterrows():
             eid = row.related_event_id
             path = self.root / "media" / "images" / f"{row.image_id}.png"
             amt, why = read_image_amount(path, self.ocr)
-            if amt is None and self.llm.enabled:
+            if amt is None and self.use_llm:
                 desc = self.ds.events.loc[self.ds.events.event_id == eid, "description"]
                 out = self.llm.read_image(path, str(desc.iloc[0]) if len(desc) else "")
                 if out and isinstance(out.get("amount"), (int, float)) and out["amount"] > 0:
