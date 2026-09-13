@@ -37,9 +37,6 @@ ONE_OFF_INCOME_WORDS = ("arrears", "bonus", "prize", "reimburse", "windfall", "s
 
 MIN_RATIO = {"shopping": 0.4}
 DEFAULT_MIN_RATIO = 0.5
-# observed multiplicative noise bands around the base amount (max/min of a clean series
-# is ~1.7 for groceries/transport/dining and ~1.25 for utilities/healthcare/shopping/entertainment)
-NOISE_WIDE, NOISE_TIGHT = 0.28, 0.12
 # Spending that recurs every three weeks keeps its cadence, but the next occurrence is reserved
 # about 15 days after the last one (the reference decisions consistently reserve the next such
 # item before the following payday even when a strict 21-day step would land just after it).
@@ -164,13 +161,10 @@ def _base_amount(cat: str, amounts: list[float], flexibility: str, min_allowed: 
         return float(vals[np.argmax(counts)])
     if flexibility in ("reducible", "reducible_or_stoppable") and min_allowed and not pd.isna(min_allowed):
         return float(min_allowed) / MIN_RATIO.get(cat, DEFAULT_MIN_RATIO)
-    lo, hi = float(a.min()), float(a.max())
-    width = NOISE_TIGHT if hi / lo <= 1.30 else NOISE_WIDE
-    # the base must satisfy hi <= base*(1+w) and lo >= base*(1-w): take the centre of that interval
-    b_lo, b_hi = hi / (1 + width), lo / (1 - width)
-    if b_lo <= b_hi:
-        return (b_lo + b_hi) / 2.0
-    return (lo + hi) / 2.0
+    # amounts vary uniformly around the base (max/min of a clean series is ~1.7 for groceries, transport
+    # and dining and ~1.25 for utilities, healthcare, shopping and entertainment); the mid-range is the
+    # unbiased, minimum-variance estimate of the centre of a uniform band whatever its width
+    return (float(a.min()) + float(a.max())) / 2.0
 
 
 def is_one_off_credit(row) -> bool:
