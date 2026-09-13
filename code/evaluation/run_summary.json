@@ -1,7 +1,7 @@
 {
   "requests": 250,
   "output": "/home/wsl/buy-or-wait/output.csv",
-  "seconds": 4.0,
+  "seconds": 4.5,
   "verification_problems": [],
   "llm": {
     "model": "claude-sonnet-4-5",
