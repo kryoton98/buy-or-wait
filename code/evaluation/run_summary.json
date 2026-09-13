@@ -1,15 +1,27 @@
 {
   "requests": 250,
   "output": "/home/wsl/buy-or-wait/output.csv",
-  "seconds": 4.5,
+  "seconds": 864.4,
+  "decision_seconds": 4.2,
   "verification_problems": [],
   "llm": {
-    "model": "claude-sonnet-4-5",
-    "calls": 0,
+    "provider": "google",
+    "model": "gemini-3.5-flash-lite",
+    "calls": 215,
     "cache_hits": 0,
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "enabled": false
+    "input_tokens": 117388,
+    "output_tokens": 20583,
+    "thinking_tokens": 0,
+    "retries": 0,
+    "enabled": true,
+    "used_for_decisions": false
+  },
+  "llm_audit": {
+    "messages": 215,
+    "agree": 121,
+    "disagree": 94,
+    "no_reading": 0,
+    "report": "code/evaluation/llm_audit.md"
   },
   "image_evidence": {
     "event_253": {
