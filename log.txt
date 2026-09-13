@@ -407,3 +407,47 @@ branch=gemini-provider
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T02:27:53+00:00] LLM audit triaged 55/32/7; household-income fix proposed; usage report
+
+User Prompt (verbatim, secrets redacted):
+I created ~/.gemini_key and ran `python3 code/main.py --llm off --llm-audit` myself:
+215 calls, 121 agree / 94 disagree, 0 without a reading, output.csv unchanged
+(byte-identical to v3). Time-box 30 minutes.
+
+1. Triage the 94 disagreements in code/evaluation/llm_audit.md. Group them by
+   (rule kind -> model kind) pair and split each group into:
+   (a) same situation, different label or redundant fact, no forecast effect;
+   (b) the model extracted a fact the rules deliberately ignore — cite the solved sample
+       or HANDOVER rule that justifies ignoring it (e.g. commission-pending amount ->
+       sample 11; arrears -> sample 03; freelance stream stopped when an invoice is
+       confirmed -> "do not invent unsupported income");
+   (c) facts differ in a way that would change a forecast input.
+   For every (c) case read the message yourself and say who is right. Only a (c) case
+   where the model is right is a rule bug: propose the fix, score it on the 25 samples,
+   give the blast radius vs output.csv, and let me decide. Write the triage as a
+   "Triage" section at the top of llm_audit.md with the counts per category.
+2. Regenerate code/evaluation/usage_report.md from run_summary.json: provider Google,
+   model gemini-3.5-flash-lite, 215 calls, 117,388 input / 20,583 output tokens, totals
+   and per-request averages over 250 requests, cost at the Gemini list prices you found
+   and US$0 on the free tier; keep the note that the calls were the report-only audit
+   and that no decision depended on a model call.
+3. Commit and push llm_audit.md, run_summary.json and usage_report.md to
+   gemini-provider, plus this turn's log entry. Never the key.
+
+Agent Response Summary:
+Rebuilt the audit from code/cache/llm_cache.json with the API keys removed (121 agree / 94 disagree reproduced, 215 cache hits, no live calls) and replayed every disagreement with the model's facts in place of the rule facts to measure forecast and decision effects. Triage by (rule kind -> model kind): 55 (a) labels or redundant facts with no forecast effect, 32 (b) facts the rules deliberately ignore (15 unapproved invoices, AGENTS.md 6.3 and HANDOVER rule 8; 9 pending-commission base salaries, sample 11; 8 arrears credits, sample 03), and 7 (c) household-income-ended messages. In (c) the rules rightly stop the ended secondary income but ignore the stated remaining confirmed salary (the history primary salary is exactly 62% of it for all seven users), while the model's income_stopped would stop all income; proposed, not applied: the template also emits the stated salary as a permanent salary_amount, scored in memory with the 25 samples unchanged (total 122, median 0.50%) and 3 of 250 rows changing (request_42, 50, 58 to affordable now). Also found that undated model one-time credits crash apply_facts in the fallback path (fix proposed, not applied). Wrote the Triage section at the top of llm_audit.md, regenerated usage_report.md (Google gemini-3.5-flash-lite, 215 calls, 117,388 input / 20,583 output tokens, 551.9 tokens per request, US$0 free tier, US$0.0867 at list prices), validated the unchanged output (VALID), and committed llm_audit.md, run_summary.json and usage_report.md as 437f313 with this log on gemini-provider, then pushed after an exact-key scan.
+
+Actions:
+* read code/evaluation/llm_audit.md and code/evaluation/run_summary.json; checked output.csv and decisions_debug.jsonl against HEAD
+* wrote and ran scratchpad triage.py, triage_c.py and household_fix.py (cache only, keys removed from the environment)
+* ran python3 code/evaluation/main.py validate; python3 code/evaluation/compare.py output.csv /tmp/household_fix_output.csv
+* edited code/evaluation/llm_audit.md (Triage section); rewrote code/evaluation/usage_report.md
+* key scans (pattern and exact value, value never printed); git commit 437f313 "docs(eval): Gemini audit of the message readings, triaged"; git commit of log.txt; git push
+
+Context:
+tool=Claude Code
+branch=gemini-provider
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
