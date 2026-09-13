@@ -333,3 +333,40 @@ branch=tune-forecast
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T01:26:17+00:00] Final packaging: README, usage report, HANDOVER changes, code.zip
+
+User Prompt (verbatim, secrets redacted):
+Final packaging, time-box 30 minutes, no forecast changes.
+1. Refresh code/README.md so it matches the code: mid-range estimator (not the noise
+   band), PLAN_TOL_FRAC 0.3%, FIRST_GAP {21:15, 7:6}, the subtotal rule for images, the
+   current sample scores (25/25 status, 25/25 method, 24/25 plan, 24/25 changes, 24/25
+   earliest, median 0.50%, mean 2.24%), and mention compare.py and the experiments folder.
+2. From the repo root run python3 code/main.py, then evaluation validate and samples.
+   Regenerate code/evaluation/usage_report.md from this run (still 0 model calls) with
+   today's date and run time, keeping the projected-cost and development-assistance sections.
+3. Add a "Changes since submission-v1" section to HANDOVER.md summarising the four kept
+   changes (subtotal fix, FIRST_GAP[7]=6, mid-range estimator, tolerance 0.003) and the
+   rejected experiments, with one line each.
+4. Remove __pycache__ dirs, rebuild code.zip with
+   zip -r code.zip code -x "*/__pycache__/*" "*.pyc", and confirm log.txt has this
+   session's entries. Commit and push everything except code.zip, then show
+   git log --oneline submission-v1..HEAD.
+
+Agent Response Summary:
+Refreshed code/README.md to match the code (mid-range base estimate, FIRST_GAP {21: 15, 7: 6}, item-subtotal rule for images, 0.3% plan tolerance, current sample scores, compare.py and evaluation/experiments). From the repo root ran python3 code/main.py (250 rows, 4.5 s, 0 verification problems, 0 model calls; output.csv byte-identical to the committed one), validate (VALID) and samples (status 25/25, method 25/25, plan 24/25, changes 24/25, earliest 24/25, median 0.50%, mean 2.24%), and regenerated code/evaluation/usage_report.md from that run, keeping the projected-cost and development-assistance sections with updated image counts and Claude Code tuning. Added "Changes since submission-v1" to HANDOVER.md (four kept changes, the tooling, nine rejected experiments) and corrected its intro about log.txt. Removed __pycache__, rebuilt code.zip from scratch with the given zip command (no cache files inside), confirmed this session's SESSION START and turn entries in log.txt, committed README, usage report, HANDOVER and log separately (code.zip stays gitignored) and pushed.
+
+Actions:
+* read code/README.md, code/evaluation/usage_report.md, HANDOVER.md; checked tag submission-v1 (26dc95c), zip, __pycache__ directories, .gitignore and log.txt entry headers
+* rewrote code/README.md; edited HANDOVER.md (intro, Changes since submission-v1)
+* ran python3 code/main.py, python3 code/evaluation/main.py validate, python3 code/evaluation/main.py samples
+* rewrote code/evaluation/usage_report.md from that run (code/evaluation/run_summary.json)
+* removed __pycache__ directories; rm -f code.zip; zip -r code.zip code -x "*/__pycache__/*" "*.pyc"; listed the archive with python3 -m zipfile -l
+* git commits: docs(readme), docs(eval), docs(handover), chore log; git push; git log --oneline submission-v1..HEAD
+
+Context:
+tool=Claude Code
+branch=tune-forecast
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
