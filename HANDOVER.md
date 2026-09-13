@@ -12,7 +12,7 @@ locally for submission).
   flexible-only spending changes).
 - `python3 code/evaluation/main.py samples` → status 25/25, method 25/25, plan 24/25,
   changes 24/25, earliest date 24/25, median |error| of `amount_safe_to_pay` 0.5 % (mean 2.2 %).
-  Decisions differ on request_17 (earliest date), request_19 (plan) and request_21 (changes);
+  Decisions differ on request_12 (changes), request_17 (earliest date) and request_19 (plan);
   request_05, 10, 13, 14, 15 and 25 differ only in the amount.
 
 ## Architecture (code/buyorwait)
@@ -54,7 +54,8 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
    (`regular_mask`).
 6. **Stale series** (monthly gap > 45 d, periodic > 2p + 2) are treated as stopped; a "final"
    payroll stops income; a scheduled next-salary row sets both the level and the date.
-7. **Plan feasibility tolerance** (`PLAN_TOL_FRAC = 0.012` in `forecast.py`) applies *only* when
+7. **Plan feasibility tolerance** (`PLAN_TOL_FRAC = 0.003` in `forecast.py`, lowered from 0.012
+   after the mid-range estimate removed the implicit margin; see Experiments) applies *only* when
    judging whether a candidate plan stays above the minimum — never to `amount_safe_to_pay` or
    `earliest_date_for_full_payment`.
 8. **Message semantics** (`evidence.py::TEMPLATES` + `read_message`): a salary raise replaces the
@@ -72,10 +73,11 @@ Changing any of these will move the score; re-run `evaluation/main.py samples` a
 
 ## Known open items / ideas
 
-- request_21: the reference stops event_1815 and reduces event_1816; the forecast with mid-range
-  bases only needs the reduction. It matched under the previous noise-interval estimate, which
-  reserved slightly more; request_12 is the mirror case and now matches. request_06 was a
-  weekly-chain timing difference, fixed by `FIRST_GAP[7] = 6`.
+- request_12: the reference uses no spending change where the forecast needs
+  `reduce_to:event_1017`. With mid-range bases it matches only at a plan tolerance of 0.012 or
+  more, while request_21 (reference: stop event_1815 and reduce event_1816) matches only at 0.006
+  or less, so no single `PLAN_TOL_FRAC` gets both. request_06 was a weekly-chain timing difference,
+  fixed by `FIRST_GAP[7] = 6`.
 - request_19 (30-minute investigation on 2026-09-13, no general rule found): the reference's
   28,820 vs our 29,732.13 is a reservation difference, not rounding. Headroom is 199,545 − 92,800
   = 106,745 and the binding checkpoint is 2024-09-14, the day before payday. We reserve 77,012.87
@@ -148,6 +150,21 @@ request_21's no longer does, and amounts within 2 % drop from 19 to 18.
 | noise interval W 0.30, T 0.10 | 25 | 25 | 24 | 24 | 24 | 18 | 3.81 % | 0.75 % |
 | noise interval W 0.30, T 0.12 | 25 | 25 | 24 | 24 | 24 | 20 | 3.88 % | 0.76 % |
 | noise interval W 0.30, T 0.15 | 25 | 25 | 24 | 24 | 24 | 20 | 4.16 % | 0.94 % |
+
+**Plan feasibility tolerance** (2026-09-13, `PLAN_TOL_FRAC` with the mid-range estimator). Amounts,
+earliest dates and the error columns do not depend on it (18 within 2 %, mean 2.24 %, median
+0.50 % throughout). 0.003 adopted: the highest exact-match total with no count below the previous
+0.012, and the smallest such tolerance. It swaps request_12's change set (lost) for request_21's
+(gained). Blast radius is against the 0.012 output.
+
+| tolerance | status | method | plan | changes | earliest | total | 06 | 11 | 12 | 17 | 21 | rows changed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.000 | 24 | 23 | 23 | 23 | 24 | 117 | status, method, plan, changes | ok | changes | earliest | ok | 15 (2 statuses) |
+| **0.003 (adopted)** | 25 | 25 | 24 | 24 | 24 | 122 | ok | ok | changes | earliest | ok | 13 (12 change sets; request_139 not affordable) |
+| 0.006 | 25 | 25 | 24 | 24 | 24 | 122 | ok | ok | changes | earliest | ok | 7 (1 status) |
+| 0.009 | 25 | 25 | 24 | 23 | 24 | 121 | ok | ok | changes | earliest | changes | 4 (1 status) |
+| 0.012 (previous) | 25 | 25 | 24 | 24 | 24 | 122 | ok | ok | ok | earliest | changes | — |
+| 0.015 | 25 | 25 | 24 | 24 | 24 | 122 | ok | ok | ok | earliest | changes | 3 (change sets only) |
 
 ## Conventions to keep
 

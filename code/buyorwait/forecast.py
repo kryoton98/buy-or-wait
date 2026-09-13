@@ -375,8 +375,9 @@ SAFETY_TOL = 0.005
 # partial schedule or a full payment after spending changes) stays above the minimum: variable
 # spending is estimated from noisy history, so a plan that misses the floor by less than this
 # fraction of the reserved outflow is treated as feasible. The safe amount and the earliest
-# date are always computed without it.
-PLAN_TOL_FRAC = 0.012
+# date are always computed without it. (It was 0.012 while base estimates carried an upward
+# small-sample bias; with the unbiased mid-range estimate 0.003 scores best.)
+PLAN_TOL_FRAC = 0.003
 
 
 def is_safe(st: State, payments, changes=None, tolerance: bool = False) -> bool:

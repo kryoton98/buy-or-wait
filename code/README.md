@@ -77,7 +77,7 @@ request_payment_options.csv ─► installment schedules                        
 4. **Verification** – bounds on `amount_safe_to_pay`, `affordable_now ⇒ earliest = request_date`,
    partial = exactly two payments summing to the request, installment schedule byte-equal to the
    option, ≤ 3 changes on flexible events only, and a re-simulation of the chosen plan. A small
-   forecast-uncertainty allowance (1.2 % of the reserved outflow) is applied only when judging plan
+   forecast-uncertainty allowance (0.3 % of the reserved outflow) is applied only when judging plan
    feasibility; the two numeric outputs never use it.
 
 ## Evaluation
