@@ -370,3 +370,40 @@ branch=tune-forecast
 repo_root=/home/wsl/buy-or-wait
 worktree=main
 parent_agent=none
+
+## [2026-09-13T01:54:57+00:00] Gemini provider + --llm-audit tested offline; audit waits for GEMINI_API_KEY
+
+User Prompt (verbatim, secrets redacted):
+Add Google Gemini as a second provider in code/buyorwait/evidence.py::LLMExtractor,
+selected when GEMINI_API_KEY is set and ANTHROPIC_API_KEY is not. Use the REST
+generateContent endpoint with urllib only (no new dependencies), the system prompt from
+code/prompts/, temperature 0, JSON output, and read token counts from the response's
+usageMetadata. Check the current docs for the model id to default to and the free-tier
+rate limits, and add a small delay plus retry-with-backoff on 429. Keep the same cache
+file and the same validation of the returned JSON.
+
+Then add --llm-audit to code/main.py: read every messages.csv row with the model,
+compare its kind and facts with the rule-based reading, and write
+code/evaluation/llm_audit.md (per message_id: agree/disagree, both readings when they
+differ). The audit must not change any decision. Record provider, model, calls and
+tokens in run_summary.json and regenerate usage_report.md from it, listing Google as
+the provider for the final run. Show me the disagreement list; if any reveals a real
+template bug, propose the fix with blast radius and let me decide. Commit and push
+(never the key).
+
+Agent Response Summary:
+Checked the current Gemini docs: gemini-3.5-flash-lite is the recommended fast, low-cost model (paid tier US$0.30 / US$2.50 per 1M input / output tokens, free tier free of charge); per-model free-tier rate limits are no longer published (AI Studio per project, 429 RESOURCE_EXHAUSTED, daily reset at midnight Pacific), and unofficial 2026 guides cite 10-15 RPM for Flash/Flash-Lite. Implemented the Gemini provider in LLMExtractor (REST generateContent via urllib, key in the x-goog-api-key header, system prompt from code/prompts/, temperature 0, JSON output, minimal thinking level with a fallback, usageMetadata token counts, 4 s request spacing, 429/503 retry with RetryInfo or exponential backoff, same cache file and validation), a shared validation helper, report-only --llm-audit (code/buyorwait/llm_audit.py) and run_summary fields; --llm off now only keeps decisions away from the model. Verified offline with a fake HTTP layer (all checks pass) and without a key (output.csv and decisions_debug.jsonl byte-identical, sample scores unchanged, --llm-audit exits 2 with a clear message); committed on a new branch gemini-provider as 64b99a3 and pushed. The live audit, the Google usage report, the disagreement list and any template-bug proposal are blocked: GEMINI_API_KEY is not set in the WSL login shell or on Windows (an earlier check that reported both keys as set was a quoting false positive and was corrected), so the user was asked to expose the key to WSL without pasting it into the chat.
+
+Actions:
+* WebFetch of ai.google.dev Gemini models, rate-limits, generateContent reference, pricing and thinking pages; WebSearch for free-tier limits
+* key presence checks (values never printed) in WSL and Windows; scratchpad gemini_probe.py (stopped: no key)
+* edited code/buyorwait/evidence.py, code/buyorwait/pipeline.py, code/main.py, code/README.md; created code/buyorwait/llm_audit.py
+* wrote and ran scratchpad llm_offline_tests.py; ran python3 code/main.py --llm off, python3 code/main.py, samples scorer and --llm-audit without a key
+* git switch -c gemini-provider; git commit 64b99a3 "feat(evidence): Google Gemini provider and --llm-audit"; git push -u origin gemini-provider
+
+Context:
+tool=Claude Code
+branch=gemini-provider
+repo_root=/home/wsl/buy-or-wait
+worktree=main
+parent_agent=none
